@@ -4,6 +4,7 @@ import os.path
 import sys
 import datetime
 import socket
+import threading
 
 global _status
 global _headers
@@ -150,27 +151,16 @@ if __name__ == "__main__":
     port = 8000
 
     #print "binding", interface, port
-    print "Homework 7 Socket Server"
+    print "Homework 8 Threaded Socket Server"
     print "Serving HTTP on port 8000..."
     sock = socket.socket()
     sock.bind( (interface, port) )
     sock.listen(5)
 
     while 1:
-        # this should allow the sock to never get 'stuck' open
-        # doesn't work, still gets stuck occasionally
-        # too tired to care // it works after the 60 second unix timeout
-        try:
-            #print "waiting..."
-            (client_sock, client_address) = sock.accept()
-            #print "connection established...", client_address
-            # handle the connection
-            handle_connection(client_sock)
-        except KeyboardInterrupt:
-            print
-            try:
-                sock.close()
-                sys.exit()
-            except:
-                sys.exit()
-
+        (client_sock, client_address) = sock.accept()
+        print "Got connection", client_address
+        
+        t = threading.Thread(target=handle_connection, args=(client_sock,))
+        print "Starting thread"
+        t.start()

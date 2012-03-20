@@ -1,11 +1,9 @@
 {% extends "base.html" %}
 
 {% block body %}
-
-<form action='create_user_action' method='get'>
-    Username: <input type='text' name='username'><br>
-    Password:<input type='text' name='password'><br>
-    <input type='Submit' value='Create User' />
-</form>
-
+ <form action='create_user' method='POST'>
+  Username: <input type='text' name='username'><br>
+  Password:<input type='text' name='password'><br>
+  <input type='submit' value='Create User'>
+ </form>
 {% endblock body %}

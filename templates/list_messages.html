@@ -1,38 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}meep: list messages!{% endblock title %}
+{% block title %}Threads{% endblock title %}
 
 {% block body %}
 
- {% for item in messages %}
+{% for thread in threads %}
 
-  id: {{ item.id }}<p>
-  title: {{ item.title }}<p>
-  message: {{ item.post }}<p>
-  author: {{ item.author.username }}<p>
-  
-  {% if user %}
-  <script type='text/javascript'>var clearedResponseText = false;</script>
-  <form action='reply' method='get'>
-  <input type='hidden' name='title' value='{{ item.title }}' />
-  <input type='hidden' name='parentPostID' value='{{ item.id }}' />
-  <input type='text' name='message' value='Enter a response here'
-      onclick="if (!clearedResponseText) {
-          value = ''; 
-          clearedResponseText = true;
-      }" />
-  <input type='submit' value='Submit response' />
-  </form>
-  <form action='remove' method='get'>
-   		<input type='hidden' name='messageID' value='{{ item.id }}' />
-   		<input type='submit' value='Delete this message' />
-  </form>
-  
-  {% endif %}
+    <hr>
+    <h2>{{ thread.title }}</h2>
 
-  <hr>
- {% endfor %}
+    {% for item in thread.get_all_posts() %}
 
-<a href='../../'>index</a>
+    <hr>
+    <p>{{ item.post }}</p>
+    <p>Posted by: {{ item.author.username }}</p>
+
+    {% if user %}
+    <form action='reply' method='POST'>
+    <input name='thread_id' type='hidden' value='{{ thread.id }}' />
+    <input name='reply' type='submit' value='Reply to' />
+    </form>
+    <form action='delete_action' method='POST'>
+    <input name='thread_id' type='hidden' value='{{ thread.id }}' />
+    <input name='post_id' type='hidden' value='{{ item.id }}' />
+    <input name='delete' type='submit' value='Delete Message' />
+    </form>
+    {% endif %}
+
+    {% endfor %}
+
+{% endfor %}
+
+<hr>
+<a href='../../'>Back to Main Page</a>
 
 {% endblock body %}

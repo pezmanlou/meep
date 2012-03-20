@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
 {% block body %}
-
-<form action='login' method='get'>
+  <h1>Welcome!</h1>
+  <h2>Please Login or create an account.</h2>
+  <form action='login' method='POST'>
     Username: <input type='text' name='username'><br>
-    Password: <input type='text' name='password'><br>
-    <input type='submit' value='Login' />
-</form>
-
+    Password:<input type='text' name='password'><br>
+    <input type='submit' value='Login'>
+  </form>
+  <p>Don't have an account? Create a user <a href='/create_user'>here</a>
 {% endblock body %}

@@ -1,5 +1,3 @@
-import pickle
-
 """
 meeplib - A simple message board back-end implementation.
 
@@ -25,69 +23,69 @@ Functions and classes:
 
 """
 
+import cPickle
+from Cookie import SimpleCookie
+
+
 __all__ = ['Message', 'get_all_messages', 'get_message', 'delete_message',
-           'User', 'get_user',
-           'get_all_users', 'delete_user', 'is_user']
+           'User', 'get_user', 'get_all_users', 'delete_user', 'Thread']
 
 ###
 # internal data structures & functions; please don't access these
 # directly from outside the module.  Note, I'm not responsible for
 # what happens to you if you do access them directly.  CTB
 
+
+# a string, stores the current user that is logged on
+_curr_user = []
+
 # a dictionary, storing all messages by a (unique, int) ID -> Message object.
 _messages = {}
 
+# a dictionary, storing all threads by a (unique, int) ID -> Thread object.
+_threads = {}
+
+def _get_next_thread_id():
+    if _threads:
+        return max(_threads.keys()) + 1
+    return 0
+
 # a dictionary, storing all users by a (unique, int) ID -> User object.
 _user_ids = {}
-
 # a dictionary, storing all users by username
 _users = {}
 
-def _getFileName():
-    return 'meepBackup.txt'
-
-def _backup_meep():
-    meepBackup = open(_getFileName(), 'w')
-    pickle.dump(_users, meepBackup)
-    pickle.dump(_user_ids, meepBackup)
-    pickle.dump(_messages, meepBackup)
-    meepBackup.close()
-      
-def _load_backup():
-    global _messages, _users, _user_ids
-    meepBackup = open(_getFileName(), 'r')
-    _users = pickle.load(meepBackup)
-    _user_ids = pickle.load(meepBackup)
-    _messages = pickle.load(meepBackup)
-    meepBackup.close()
-
-def _get_root_messages():
-    rootMessages = []
-    for m in _messages.values():
-        if m.parentPostID == -1:
-            rootMessages.append(m)
-    return rootMessages
-
-def _get_next_message_id():
-    if _messages:
-        return max(_messages.keys()) + 1
-    return 0
-
 def _get_next_user_id():
     if _users:
-        return max(_user_ids.keys()) + 1 
+        return int(max(_user_ids.keys())) + 1
     return 0
 
 def _reset():
     """
     Clean out all persistent data structures, for testing purposes.
     """
-
-    global _messages, _users, _user_ids
-
+    global _messages, _users, _user_ids, _curr_user
     _messages = {}
     _users = {}
     _user_ids = {}
+
+def save_state():
+    filename = "save.pickle"
+    fp = open(filename, 'w')
+    objects = (_threads, _user_ids, _users)
+    cPickle.dump(objects, fp)
+    fp.close()
+
+def load_state():
+    global _threads, _user_ids, _users
+    try:
+        filename = "save.pickle"
+        fp = open(filename, 'r')
+        objects =cPickle.load(fp)
+        (_threads, _user_ids, _users) = objects
+    except IOError:
+        #print "meeplib.load_state() IOError"
+        return {}, {}, {}
 
 ###
 
@@ -98,82 +96,89 @@ class Message(object):
     'author' must be an object of type 'User'.
     
     """
-    def __init__(self, title, post, author, parentPostID):
-        self.title = title
+    def __init__(self, post, author):
         self.post = post
+        # is later reassigned by Thread
+        self.id = 0
+
         assert isinstance(author, User)
         self.author = author
-        self.parentPostID = parentPostID
-        self.children = {}
-        if parentPostID == -1:
-            self._save_message()
-        else:
-            self.id = _get_next_message_id()
-            _messages.get(parentPostID).children[self.id] = self
-            _messages[self.id] = self    
-        _backup_meep()
-        
-    def __cmp__(self, other):
-        if (other.title != self.title or
-            other.post != self.post or
-            other.author != self.author or
-            other.parentPostID != self.parentPostID):
-            return -1
-        else:
-            return 0
 
-    def _save_message(self):
-        self.id = _get_next_message_id()
-        
-        # register this new message with the messages list:
-        _messages[self.id] = self  
-        
+def get_all_threads(sort_by='id'):
+    return _threads.values()
 
-def build_tree(children):
-    tree = []
-    for c in children:
-        tree.append(c)
-        tree += build_tree(c.children.values())
- 
-    return tree
-
-def get_all_messages():
-    return build_tree(_get_root_messages())
-    
-def get_message(id):
-    return _messages[id]
+def get_thread(id):
+    return _threads[id]
 
 def delete_message(msg):
     assert isinstance(msg, Message)
-    for c in msg.children.values():
-        delete_message(c)
-    
-    if msg.parentPostID == -1:
-        del _messages[msg.id]
-    else:
-        del _messages[msg.parentPostID].children[msg.id]
-        del _messages[msg.id]
-    _backup_meep()
+    del _messages[msg.id]
 
 ###
+
+class Thread(object):
+    """
+    Thread object, consisting of a simple dictionary of Message objects.
+    Allows users to add posts to the dictionary.
+    New messages must be of an object of type "Message".
+    """
+
+    def __init__(self, title):
+        # a dictionary, storing all messages by a (unique, int) ID -> Message object.
+        self.posts = {}
+        self.save_thread()
+        self.title = title
+
+    def save_thread(self):
+        self.id = _get_next_thread_id()
+        _threads[self.id] = self
+
+    def add_post(self, post):
+        assert isinstance(post, Message)
+        post.id = self.get_next_post_id()
+        self.posts[post.id] = post
+        
+    def delete_post(self, post):
+        assert isinstance(post, Message)
+        del self.posts[post.id]
+        # if there are no more posts in self.posts, delete the self Thread object and the reference to the thread in _threads
+        if not self.posts:
+            del _threads[self.id]
+            del self
+            
+    def get_post(self, id):
+        return self.posts[id]
+
+    def get_next_post_id(self):
+        if self.posts:
+            return max(self.posts.keys()) + 1
+        return 0
+
+    def get_all_posts(self, sort_by = 'id'):
+        return self.posts.values()
 
 class User(object):
     def __init__(self, username, password):
         self.username = username
-        self.password = password    
+        self.password = password
+
         self._save_user()
-        
-    def __cmp__(self, other):
-        if (other.username != self.username or other.password != self.password):
-            return -1
-        else:
-            return 0
 
     def _save_user(self):
         self.id = _get_next_user_id()
+
+        # register new user ID with the users list:
         _user_ids[self.id] = self
         _users[self.username] = self
-        _backup_meep()
+
+def set_curr_user(username):
+    _curr_user.insert(0, username)
+
+def get_curr_user():
+    return _curr_user[0]
+
+def delete_curr_user(username):
+    _curr_user.remove(_curr_user.index(0))
 
 def get_user(username):
     return _users.get(username)         # return None if no such user
@@ -184,4 +189,20 @@ def get_all_users():
 def delete_user(user):
     del _users[user.username]
     del _user_ids[user.id]
-    
+
+def check_user(username, password):
+    try:
+        aUser = get_user(username)
+    except NameError:
+        aUser = None
+    try:
+        password
+    except NameError:
+        password = None
+
+    if aUser is not None:
+            if aUser.password is not None:
+                if aUser.password == password:
+                    return True
+    else:
+        return False
