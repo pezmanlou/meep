@@ -1,37 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}Threads{% endblock title %}
+{% block title %}meep: Messages!{% endblock title %}
 
 {% block body %}
 
-{% for thread in threads %}
-
-    <hr>
-    <h2>{{ thread.title }}</h2>
-
-    {% for item in thread.get_all_posts() %}
-
-    <hr>
-    <p>{{ item.post }}</p>
-    <p>Posted by: {{ item.author.username }}</p>
-
-    {% if user %}
-    <form action='reply' method='POST'>
-    <input name='thread_id' type='hidden' value='{{ thread.id }}' />
-    <input name='reply' type='submit' value='Reply to' />
-    </form>
-    <form action='delete_action' method='POST'>
-    <input name='thread_id' type='hidden' value='{{ thread.id }}' />
-    <input name='post_id' type='hidden' value='{{ item.id }}' />
-    <input name='delete' type='submit' value='Delete Message' />
-    </form>
-    {% endif %}
-
-    {% endfor %}
-
+{% if messages %}
+{% for message in messages %}
+	{% if message.pID == '!' %}
+		{{ print_message(message) }}
+	{% endif %}
 {% endfor %}
+{% endif %}
 
-<hr>
-<a href='../../'>Back to Main Page</a>
+{% if not messages %}
+	No messages to display.
+{% endif %}
+		
+
+<form action = 'add' method = 'POST'>
+                 <input type = 'hidden' name = 'pID' value = '!'>
+                 <input type = 'submit' value = 'Add Message'>
+                 </form><p>
+<form action = '../main_page'>
+                 <input type = 'submit' value = 'Index'>
+                 </form>
 
 {% endblock body %}
+
+{% macro print_message(message) %}
+	ID: {{ message.id }} <br>
+	Title: {{ message.title }} <br>
+	Message: {{ message.post }} <br>
+	Author: {{ message.author.username }} <br>
+	<form action = 'add' method = 'POST'  style="margin:0;">
+            	<input type = 'submit' value = 'Reply' />
+            	<input type = 'hidden' name = 'pID' value = '{{ message.id }}' />
+           	</form>
+	<form action = 'delete' method = 'POST'  style="margin:0;">
+            	<input type = 'submit' value = 'Delete Post' />
+            	<input type = 'hidden' name = 'id' value = '{{ message.id }}' />
+           	</form>
+            	<hr>
+	{% if message.replies %}
+		{% for reply in message.replies %}
+			<blockquote>
+			{{ print_message(messages[reply]) }}
+			</blockquote>
+		{% endfor %}
+	{% endif %}
+{% endmacro %}

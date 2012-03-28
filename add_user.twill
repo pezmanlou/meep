@@ -1,9 +1,0 @@
-go http://localhost:8008/
-follow "here"
-
-fv 1 username 'ilovekittens'
-fv 1 password 'password'
-submit 'Create User'
-
-follow 'Log out'
-

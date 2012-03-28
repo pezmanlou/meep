@@ -1,21 +1,15 @@
 import unittest
 import meep_example_app
-import urllib
-import sys
-import os.path
-cwd = os.path.dirname(__file__)
-importdir = os.path.abspath(os.path.join(cwd, '../'))
-if importdir not in sys.path:
-    sys.path.append(importdir)
-import meep_example_app
+import meeplib
 
 class TestApp(unittest.TestCase):
     def setUp(self):
         meep_example_app.initialize()
         app = meep_example_app.MeepExampleApp()
         self.app = app
+        meeplib._reset()
 
-    def test_index_no_auth(self):
+    def test_index(self):
         environ = {}                    # make a fake dict
         environ['PATH_INFO'] = '/'
 
@@ -24,109 +18,117 @@ class TestApp(unittest.TestCase):
             assert ('Content-type', 'text/html') in headers
 
         data = self.app(environ, fake_start_response)
-        assert 'Login' in data[0]
-        assert 'here' in data[0]
-
-    def test_index_with_auth(self):
-        environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/'
-        environ['HTTP_COOKIE'] = "username=george"
-
-        def fake_start_response(status, headers):
-            assert status == '200 OK'
-            assert ('Content-type', 'text/html') in headers
-
-        data = self.app(environ, fake_start_response)
-
-        assert 'New Thread' in data[0]
-        assert 'Show messages' in data[0]
-
-    def test_thread_list(self):
-        environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/m/list'
-
-        def fake_start_response(status, headers):
-            assert status == '200 OK'
-            assert ('Content-type', 'text/html') in headers
-
-        data = self.app(environ, fake_start_response)
-        assert 'Back to Main Page' in data[0]
+        #print data
+        #assert 'Username:' in data
+        #assert 'Password:' in data
+        #assert 'Create a user' in data
 
     def test_create_user(self):
         environ = {}                    # make a fake dict
         environ['PATH_INFO'] = '/create_user'
-        environ['wsgi.input'] = ''
 
         def fake_start_response(status, headers):
             assert status == '302 Found'
             assert ('Content-type', 'text/html') in headers
 
         data = self.app(environ, fake_start_response)
-        assert 'Username: ' in data[0]
-        assert 'Password:' in data[0]
+        #print data
+        assert 'Username:' in data
+        assert 'Password:' in data
 
-    def test_create_user_action(self):
+    def test_list_messages(self):
         environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/create_user'
-        environ['wsgi.input'] = ''
+        environ['PATH_INFO'] = '/m/list'
 
-        form_dict = {}
-        form_dict['username'] = "apptest"
-        form_dict['password'] = "pass"
-        environ['QUERY_STRING'] = urllib.urlencode(form_dict)
-
-    def test_create_thread(self):
-        environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/m/add_thread'
-        environ['wsgi.input'] = ''
-        environ['HTTP_COOKIE'] = "username=george"
+        u = meeplib.User('user', 'name')
+        m = meeplib.Message('init title', 'init message', u ,'!')
 
         def fake_start_response(status, headers):
-            assert status == '302 Found'
+            assert status == '200 OK'
             assert ('Content-type', 'text/html') in headers
 
         data = self.app(environ, fake_start_response)
-        assert 'Title: ' in data[0]
-        assert 'Message: ' in data[0]
+        index = 0
+        for m in data:
+            if "Title: init title" in m:
+                index += 1
+            if 'Message: init message' in m:
+                index += 1
+            if 'Author: user' in m:
+                index += 1
+            if 'ID: 0' in m:
+                index += 1
 
-    def test_create_thread_action(self):
+            print index
+        assert index is 4
+
+    def test_main_page(self):
         environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/m/add_thread_action'
-        environ['wsgi.input'] = ''
-        environ['HTTP_COOKIE'] = "username=george"
+        environ['PATH_INFO'] = '/main_page'
 
-        form_dict = {}
-        form_dict['title'] = "title"
-        form_dict['message'] = "message"
-        environ['QUERY_STRING'] = urllib.urlencode(form_dict)
-
-    def test_reply(self):
-        environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/m/reply'
-        environ['wsgi.input'] = ''
-        environ['HTTP_COOKIE'] = "username=george"
-
-        form_dict = {}
-        form_dict['thread_id'] = 1
-        environ['QUERY_STRING'] = urllib.urlencode(form_dict)
+        u = meeplib.User('user', 'name')
+        meeplib.set_curr_user(u.username)
+        m = meeplib.Message('init title', 'init message', u ,'!')
 
         def fake_start_response(status, headers):
-            assert status == '302 Found'
+            assert status == '200 OK'
             assert ('Content-type', 'text/html') in headers
 
         data = self.app(environ, fake_start_response)
-        assert "Message:" in data[0]
+        index = 0
+        for m in data:
+            if "Add Message" in m:
+                index += 1
+            if 'Create User' in m:
+                index += 1
+            if 'Logout' in m:
+                index += 1
+            if 'Show Messages' in m:
+                index += 1
 
-    def test_reply_action(self):
+            #print m
+        assert index is 4
+        
+
+    def test_add_reply(self):
         environ = {}                    # make a fake dict
-        environ['PATH_INFO'] = '/m/reply'
-        environ['wsgi.input'] = ''
-        environ['HTTP_COOKIE'] = "username=test"
+        environ['PATH_INFO'] = '/m/list'
+        u = meeplib.User('foo', 'bar')
+        m = meeplib.Message('the title', 'the content', u ,'!')
+        n = meeplib.Message('the reply title', 'the reply', u, m.id)
+        o = meeplib.Message('the 2nd title', 'the 2nd reply', u, n.id)
 
-        form_dict = {}
-        form_dict['thread_id'] = 1
-        form_dict['post'] = "replytest"
-        environ['QUERY_STRING'] = urllib.urlencode(form_dict)
+        assert n.id in m.replies
+        assert o.id in n.replies
+
+        meeplib.set_curr_user(u.username)
+        def fake_start_response(status, headers):
+            assert status == '200 OK'
+            assert ('Content-type', 'text/html') in headers
+
+        data = self.app(environ, fake_start_response)
+        index = 0
+        '''print data[0]
+        for m in data:
+                #print m
+                if 'Delete Post' in m:
+                    index += 1
+        print 'INDEX: '
+        print index'''
+        
+
+    def test_recursive_delete(self):
+        u = meeplib.User('foo', 'bar')
+        m = meeplib.Message('the title', 'the content', u ,'!')
+        n = meeplib.Message('the reply title', 'the reply', u, m.id)
+        o = meeplib.Message('the second tier title', 'the second reply', u, n.id)
+        
+        meeplib.delete_message(m)
+
+        assert n not in meeplib._messages.values()
+        assert o not in meeplib._messages.values()
+        
+    
 
 
     def tearDown(self):
